@@ -1,0 +1,150 @@
+================================================================================
+ TRIUMPH INSURANCE AGENCY - PHASE 4 PRODUCTION HARDENING
+ Session Log
+================================================================================
+ Session Number : 101
+ Date           : September 2, 2026
+ Project        : Triumph-Insurance-Agency-phase4-production-hardened
+ Location       : E:\blender_nairobi\new scene\
+================================================================================
+
+OBJECTIVE
+---------
+Resolve the Phase 4 Prisma schema validation failure and execute the full
+production-hardening fix list, ending in a verified, deployable build.
+
+--------------------------------------------------------------------------------
+1. PHASE 4 PRISMA SCHEMA FIX  (COMPLETED + VERIFIED)
+--------------------------------------------------------------------------------
+ LOCATION : E:\blender_nairobi\new scene\phase4_extract\triumph-work\
+            prisma\schema.prisma
+ ROOT CAUSE :
+   Models (User, Account, Session, Verification, Organization, Membership,
+   Customer, InsuranceRequest, AuditLog) and enums were collapsed onto single
+   lines with ';' separators. That is INVALID Prisma PSL -- Prisma requires one
+   field / enum value per line and does not use semicolons. The later models
+   (RequestNote onward) were already correctly formatted.
+
+ FIX :
+   Rewrote the entire schema in valid PSL, preserving every model, field,
+   relation, enum, index and constraint exactly as intended.
+
+ VERIFIED :
+   - 0 semicolons remain
+   - prisma validate            -> "The schema is valid"
+   - prisma migrate diff --from-empty matches the existing
+     20260902_phase4_hardening/migration.sql
+
+ DELIVERABLE : Triumph-Insurance-Agency-phase4-production-hardened-fixed.zip
+
+--------------------------------------------------------------------------------
+2. FOLLOW-UP FIX LIST  (COMPLETED + VERIFIED)
+--------------------------------------------------------------------------------
+ Working copy: E:\blender_nairobi\new scene\fixed1_extract\triumph-work\
+ Final zip   : Triumph-Insurance-Agency-phase4-production-hardened-fixed2.zip
+
+ [1] Synchronize package-lock.json with package.json ........................ DONE
+     - lockfile was missing @playwright/test from root devDependencies.
+     - Regenerated with `npm install --package-lock-only`.
+     - Verified all 16 dependencies match between package.json and lockfile.
+
+ [2] Fix the eight Better Auth role typing errors ............................. DONE
+     - Added `user.additionalFields.role` to lib/auth.ts
+       (type: 'string', required: false, defaultValue: 'USER').
+     - Resolves `Property 'role' does not exist on type` for
+       session.user.role across server/trpc.ts (7x) and
+       app/dashboard/requests/[id]/page.tsx (1x).
+     - Verified with `npx tsc --noEmit` -> EXIT 0 (previously 8 errors).
+
+ [3] Re-run npm ci ............................................................. DONE
+     - 95 packages installed successfully.
+
+ [4] Run Prisma generation ..................................................... DONE
+     - Prisma Client v6.19.3 generated.
+
+ [5] Run typecheck ............................................................. DONE
+     - npx tsc --noEmit -> EXIT 0.
+
+ [6] Run the production build .................................................  DONE
+     - next build -> EXIT 0. All 38 routes compiled.
+
+ [7] Install Chromium and run Playwright ..................................... RUN (1 issue)
+     - Chromium installed (Playwright chromium v1234).
+     - Results: 3 PASSED, 1 SKIPPED (auth test needs E2E_EMAIL/PASSWORD),
+       1 FAILED.
+     - The only failure (quote endpoint expects 400, got 500) is caused by the
+       Prisma-backed rate limiter requiring a LIVE PostgreSQL which was not
+       running locally. Environment limitation, NOT a code defect.
+
+ [8] Review the migration against existing Supabase database .................. DONE
+     KEY FINDING:
+       Phase 3 and Phase 4 share identical data models EXCEPT Phase 4 adds
+       the `RateLimitBucket` table.
+       => DO NOT run the full Phase 4 baseline on an existing DB (it will fail
+          because tables already exist). Apply only the RateLimitBucket delta.
+     VERIFIED delta SQL:
+       CREATE TABLE "RateLimitBucket" (
+         "key" TEXT NOT NULL,
+         "count" INTEGER NOT NULL DEFAULT 0,
+         "resetAt" TIMESTAMP(3) NOT NULL,
+         CONSTRAINT "RateLimitBucket_pkey" PRIMARY KEY ("key")
+       );
+       CREATE INDEX "RateLimitBucket_resetAt_idx" ON "RateLimitBucket"("resetAt");
+
+--------------------------------------------------------------------------------
+3. ENVIRONMENT SETUP FOR FULL E2E VERIFICATION  (IN PROGRESS)
+--------------------------------------------------------------------------------
+ GOAL : Stand up a local PostgreSQL so the app can be verified end-to-end
+        (migrate, seed, dev server, full Playwright incl. auth + RBAC +
+        cross-tenant + SSE + invitation flows).
+
+ HARD CONSTRAINT FOUND :
+   C: drive was 99% full (only ~14 MB free). This blocked npm installs, Docker
+   and any real database. E: drive has 44 GB free.
+
+ ACTION TAKEN (per user request to clean C: and use Docker on E: if possible):
+   - Cleared stale 3.2 GB npm cache on C:  (active cache now on E:)
+   - Cleared user temp files
+   -> C: free space raised from 14 MB to ~3.2 GB.
+   - Copied Docker WSL data (5.6 GB) from C:\...\AppData\Local\Docker\wsl
+     to E:\DockerData\wsl (mirror in progress).
+   - Additional caches identified for cleanup:
+        C:\Users\Admin\AppData\Local\pnpm-cache        ~360 MB
+        C:\Users\Admin\AppData\Local\pip               ~40  MB
+        C:\Users\Admin\AppData\Local\Programs\Python\Python312\Lib\site-packages ~207 MB (do NOT delete - installed packages)
+
+--------------------------------------------------------------------------------
+4. WHAT IS STILL LEFT / NOT WORKING
+--------------------------------------------------------------------------------
+ HEALTHY (code-level, verified):
+   - package-lock sync, 8 Better Auth role fixes, npm ci, prisma generate,
+     typecheck, production build, Chromium install, migration delta review.
+
+ REMAINING INFRASTRUCTURE-DEPENDENT (needs real accounts/credentials):
+   [ ] Live Supabase PostgreSQL -> DATABASE_URL + DIRECT_URL
+   [ ] Google OAuth            -> GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET
+   [ ] Resend email            -> RESEND_API_KEY + verified domain + from email
+   [ ] Production BETTER_AUTH_URL (deployed domain)
+   [ ] Strong BETTER_AUTH_SECRET (32+ chars)
+
+ VERIFICATION GAPS (need the above + a running app + live DB):
+   [ ] Full RBAC test matrix
+   [ ] Cross-tenant security tests
+   [ ] SSE notification verification
+   [ ] Invitation delivery verification
+   [ ] Complete dashboard UI final pass
+   [ ] Safe migration of existing Supabase DB (Delta RateLimitBucket)
+
+--------------------------------------------------------------------------------
+5. NEXT STEPS
+--------------------------------------------------------------------------------
+   1. Finish freeing C: space (pnpm/pip caches, delete stale Docker VHDX
+      already copied to E:).
+   2. Start Docker Desktop and run postgres:16 container on E:.
+   3. Apply Prisma migration + seed against local DB.
+   4. Start next dev and run FULL Playwright suite (incl. auth/RBAC/cross-tenant).
+   5. Then configure real production credentials (Supabase/OAuth/Resend).
+
+================================================================================
+ END OF SESSION LOG
+================================================================================

@@ -1,16 +1,3 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://triumphinsur-gwqskyrm.manus.space/api/:path*"
-    },
-    {
-      "source": "/manus-storage/:path*",
-      "destination": "https://triumphinsur-gwqskyrm.manus.space/manus-storage/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "framework": "nextjs"
 }

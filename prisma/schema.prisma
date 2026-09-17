@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  AGENT
+  MANAGER
+  ADMIN
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum RequestStatus {
+  NEW
+  IN_REVIEW
+  CONTACTED
+  PROCESSING
+  APPROVED
+  REJECTED
+  CLOSED
+}
+
+enum NotificationType {
+  REQUEST_ASSIGNED
+  STATUS_CHANGED
+  INVITATION
+  SYSTEM
+}
+
+model User {
+  id            String               @id @default(cuid())
+  name          String?
+  email         String               @unique
+  emailVerified Boolean              @default(false)
+  image         String?
+  role          Role                 @default(USER)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  memberships   Membership[]
+  requests      InsuranceRequest[]   @relation("Requester")
+  assignedRequests InsuranceRequest[] @relation("Assignee")
+  auditLogs     AuditLog[]
+  accounts      Account[]
+  sessions      Session[]
+  customer      Customer?
+  notifications Notification[]
+  requestNotes  RequestNote[]
+}
+
+model Account {
+  id                   String    @id @default(cuid())
+  userId               String
+  providerId           String
+  accountId            String
+  accessToken          String?
+  refreshToken         String?
+  accessTokenExpiresAt DateTime?
+  scope                String?
+  idToken              String?
+  password             String?
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+}
+
+model Organization {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  memberships Membership[]
+  requests    InsuranceRequest[]
+  customers   Customer[]
+  auditLogs   AuditLog[]
+  invitations Invitation[]
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole   @default(MEMBER)
+  createdAt      DateTime         @default(now())
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Customer {
+  id             String            @id @default(cuid())
+  organizationId String
+  userId         String?           @unique
+  name           String
+  email          String
+  phone          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  requests       InsuranceRequest[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId, email])
+}
+
+model InsuranceRequest {
+  id             String            @id @default(cuid())
+  userId         String?
+  organizationId String?
+  customerId     String?
+  assignedToId   String?
+  type           String
+  name           String
+  email          String
+  phone          String?
+  message        String?
+  status         RequestStatus     @default(NEW)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User?             @relation("Requester", fields: [userId], references: [id], onDelete: SetNull)
+  assignedTo     User?             @relation("Assignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  customer       Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  notes          RequestNote[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([assignedToId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  userId         String?
+  organizationId String?
+  action         String
+  resource       String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId])
+}
+
+model RequestNote {
+  id        String           @id @default(cuid())
+  requestId String
+  authorId  String
+  body      String
+  createdAt DateTime         @default(now())
+  request   InsuranceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author    User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model Invitation {
+  id             String           @id @default(cuid())
+  organizationId String
+  email          String
+  role           MembershipRole   @default(MEMBER)
+  token          String           @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  invitedById    String
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+}
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}

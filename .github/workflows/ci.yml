@@ -1,0 +1,41 @@
+name: Triumph CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: triumph
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres -d triumph"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/triumph
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/triumph
+      BETTER_AUTH_SECRET: ci-only-secret-change-this-before-production-123456
+      BETTER_AUTH_URL: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npx prisma migrate deploy
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run dev > /tmp/triumph.log 2>&1 &
+      - run: npx playwright test

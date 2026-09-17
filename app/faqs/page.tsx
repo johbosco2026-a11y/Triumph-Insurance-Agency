@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function Page(){return <main className="page"><div className="container"><p className="eyebrow">Triumph Insurance Agency</p><h1 className="page-title">Frequently asked questions</h1><p className="section-intro">Answers to common insurance questions.</p><div className="card" style={{marginTop:28,maxWidth:720}}><h2>Let’s make protection clearer.</h2><p>Tell us what you need and our team can help you choose the right next step.</p><Link className="btn btn-gold" href="/get-a-quote">Get a quote</Link></div></div></main>}
