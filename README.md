@@ -73,6 +73,14 @@ RESEND_FROM_EMAIL=
 
 `BETTER_AUTH_SECRET` must be a strong value of at least 32 characters in production.
 
+The application supports email/password authentication and Google OAuth through Better Auth. Keep `GOOGLE_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, database URLs, and email-provider keys in the deployment provider's encrypted environment settings; never commit `.env`, `.env.local`, or the downloaded Google client-secret JSON.
+
+For the production Vercel deployment, configure `BETTER_AUTH_URL=https://triumph-insurance-agency.vercel.app`. In Google Cloud Console, add this authorized redirect URI to the OAuth web client:
+
+`https://triumph-insurance-agency.vercel.app/api/auth/callback/google`
+
+For local development, use `BETTER_AUTH_URL=http://localhost:3000` and add `http://localhost:3000/api/auth/callback/google` as a separate authorized redirect URI. Google OAuth will remain unavailable until both the provider credentials and matching redirect URI are configured.
+
 ## Prisma migrations
 
 The repository contains a Phase 4 baseline migration. If you already have a database created by an earlier Triumph phase, inspect the live schema and migration history before applying the baseline. Never overwrite production data to make the migration pass.

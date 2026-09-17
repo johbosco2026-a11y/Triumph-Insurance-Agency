@@ -39,6 +39,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' | 'forgot' | 'rese
   }
 
   const titles = { login: 'Welcome back.', signup: 'Create your account.', forgot: 'Reset your password.', reset: 'Choose a new password.' };
+  async function signInWithGoogle() {
+    setError(''); setMessage(''); setPending(true);
+    try {
+      const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' });
+      if (result.error) throw new Error(result.error.message ?? 'Google sign-in is not available right now.');
+    } catch (err) { setError(err instanceof Error ? err.message : 'Google sign-in is not available right now.'); setPending(false); }
+  }
+
   return <form className="auth-card" onSubmit={submit}>
     <p className="eyebrow">Customer portal</p><h1>{titles[mode]}</h1>
     {mode === 'signup' && <div className="field" style={{ marginTop: 18 }}><label htmlFor="name">Full name</label><input id="name" name="name" required autoComplete="name" /></div>}
@@ -47,6 +55,6 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' | 'forgot' | 'rese
     {mode === 'signup' && <div className="field" style={{ marginTop: 14 }}><label htmlFor="confirmPassword">Confirm password</label><input id="confirmPassword" name="confirmPassword" type="password" required minLength={8} autoComplete="new-password" /></div>}
     {error && <div className="notice error" role="alert">{error}</div>}{message && <div className="notice success" role="status">{message}</div>}
     <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }} disabled={pending}>{pending ? 'Please wait…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : mode === 'forgot' ? 'Send reset link' : 'Update password'}</button>
-    {mode === 'login' && <><button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={async () => { await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' }); }}>Continue with Google</button><p style={{ textAlign: 'center', marginBottom: 0 }}><a className="card-link" href="/forgot-password">Forgot password?</a></p></>}
+    {mode === 'login' && <><button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={signInWithGoogle} disabled={pending}>Continue with Google</button><p style={{ textAlign: 'center', marginBottom: 0 }}><a className="card-link" href="/forgot-password">Forgot password?</a></p></>}
   </form>;
 }
