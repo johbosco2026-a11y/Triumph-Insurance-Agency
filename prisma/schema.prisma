@@ -60,8 +60,11 @@ model User {
 
 model Account {
   id                   String    @id @default(cuid())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
   userId               String
   providerId           String
+  issuer               String    @default("")
   accountId            String
   accessToken          String?
   refreshToken         String?
